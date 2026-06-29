@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>모기 신고 시스템 — 대전과학고</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+    background: #0f1923;
+    color: #e8edf2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: #162030;
+    border-bottom: 2px solid #1e3a5f;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  header h1 { font-size: 1.2rem; font-weight: 700; color: #4fc3f7; }
+  header p { font-size: 0.8rem; color: #7a9bbf; }
+  #ws-status {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .status-connected { background: #1a3a1a; color: #66bb6a; }
+  .status-disconnected { background: #3a1a1a; color: #ef5350; }
+
+  .controls {
+    padding: 14px 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tab-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab-label { font-size: 0.7rem; color: #5a7a9a; margin-bottom: 2px; }
+  .tab-btn {
+    padding: 7px 16px;
+    border: 1.5px solid #2a4a6a;
+    background: #162030;
+    color: #8aabcb;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { background: #1e3a5f; color: #cde; }
+  .tab-btn.active { background: #1565c0; border-color: #42a5f5; color: #fff; }
+
+  #map-wrapper {
+    flex: 1;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+  }
+  #map-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1.5px solid #1e3a5f;
+    border-radius: 10px;
+    background: #0d1822;
+  }
+  #floor-map {
+    display: block;
+    min-width: 600px;
+    width: 100%;
+    height: auto;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0 2px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: #8aabcb;
+  }
+  .legend-dot {
+    width: 14px; height: 14px; border-radius: 3px;
+  }
+  .dot-normal { background: #0e2240; border: 1.5px solid #2a5a9a; }
+  .dot-active { background: #7f1111; border: 1.5px solid #ef5350; }
+  .dot-utility { background: #0f1e2e; border: 1.5px solid #1e3a5a; }
+  .dot-corridor { background: #0d1925; border: 1.5px solid #1a3050; }
+  .dot-exit { background: #0a7d34; border: 1.5px solid #2ecc71; }
+
+  #stats-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: #7a9bbf;
+  }
+  #stats-bar strong { color: #ef5350; }
+
+  /* Modal */
+  #modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: #162030;
+    border: 1.5px solid #2a4a6a;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 280px;
+    max-width: 380px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #modal h2 { font-size: 1.1rem; margin-bottom: 8px; color: #4fc3f7; }
+  #modal .zone-label {
+    font-size: 1.4rem; font-weight: 700; margin: 10px 0;
+    color: #e8edf2;
+  }
+  #modal .meta { font-size: 0.78rem; color: #5a7a9a; margin-bottom: 18px; }
+  #modal .desc { font-size: 0.85rem; color: #9ab5cf; margin-bottom: 20px; line-height: 1.5; white-space: pre-line; }
+  .modal-btns { display: flex; gap: 10px; justify-content: center; }
+  .btn {
+    padding: 10px 22px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-danger { background: #c62828; color: #fff; }
+  .btn-primary { background: #1565c0; color: #fff; }
+  .btn-ghost { background: #1e3a5f; color: #8aabcb; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🦟 모기 신고 시스템</h1>
+    <p>대전과학고등학교 — 구역 클릭으로 신고</p>
+  </div>
+  <span id="ws-status" class="status-disconnected">연결 중…</span>
+</header>
+
+<div class="controls">
+  <div>
+    <div class="tab-label">건물 선택</div>
+    <div class="tab-group" id="building-tabs"></div>
+  </div>
+  <div>
+    <div class="tab-label">층 선택</div>
+    <div class="tab-group" id="floor-tabs"></div>
+  </div>
+</div>
+
+<div id="map-wrapper">
+  <div id="map-scroll">
+    <svg id="floor-map" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMid meet"></svg>
+  </div>
+  <div id="stats-bar">
+    <span>전체 신고: <strong id="total-count">0</strong>건</span>
+    <span id="building-count"></span>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot dot-normal"></div>일반 구역</div>
+    <div class="legend-item"><div class="legend-dot dot-active"></div>모기 신고됨</div>
+    <div class="legend-item"><div class="legend-dot dot-utility"></div>시설 구역</div>
+    <div class="legend-item"><div class="legend-dot dot-corridor"></div>복도</div>
+    <div class="legend-item"><div class="legend-dot dot-exit"></div>비상구</div>
+  </div>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title"></h2>
+    <div class="zone-label" id="modal-zone"></div>
+    <div class="meta" id="modal-meta"></div>
+    <div class="desc" id="modal-desc"></div>
+    <div class="modal-btns" id="modal-btns"></div>
+  </div>
+</div>
+
+<script>
+// ─── Zone data ────────────────────────────────────────────────────────────────
+// type: 'room' | 'utility' | 'corridor' | 'exit'
+// reportable: false → not clickable (EPS, stairs, exits)
+
+const FLOOR_DATA = {
+  "일신관": {
+    floors: ["1F", "2F"],
+    "1F": {
+      viewBox: "0 0 1000 296",
+      zones: [
+        // ── top row ─ y:6 h:116 (EPS 반높이)
+        {id:"ilsin_1f_eps",          name:"EPS",            x:5,   y:6,   w:32,  h:58,  type:"utility", reportable:false},
+        {id:"ilsin_1f_music1",       name:"음악실1",         x:39,  y:6,   w:140, h:116, type:"room"},
+        {id:"ilsin_1f_music2",       name:"음악실2",         x:181, y:6,   w:128, h:116, type:"room"},
+        {id:"ilsin_1f_wc_f",         name:"학생화장실(여)",   x:311, y:6,   w:48,  h:116, type:"utility"},
+        {id:"ilsin_1f_wc_m",         name:"학생화장실(남)",   x:361, y:6,   w:48,  h:116, type:"utility"},
+        {id:"ilsin_1f_stairs_l",     name:"계단",            x:411, y:6,   w:64,  h:116, type:"utility", reportable:false},
+        {id:"ilsin_1f_copy",         name:"등사실",          x:477, y:6,   w:80,  h:116, type:"room"},
+        {id:"ilsin_1f_av",           name:"시청각실",        x:559, y:6,   w:185, h:116, type:"room"},
+        {id:"ilsin_1f_stairs_r",     name:"계단",            x:746, y:6,   w:56,  h:116, type:"utility", reportable:false},
+        {id:"ilsin_1f_library",      name:"서고",            x:804, y:6,   w:190, h:116, type:"room"},
+        // ── corridor ─ y:128 h:36
+        {id:"ilsin_1f_corridor",     name:"복도",            x:5,   y:128, w:989, h:36,  type:"corridor"},
+        // ── bottom row ─ y:170 h:116
+        {id:"ilsin_1f_health",       name:"보건실",          x:5,   y:170, w:120, h:116, type:"room"},
+        {id:"ilsin_1f_music_tchr",   name:"음악교과\n연구실", x:127, y:170, w:84,  h:116, type:"room"},
+        {id:"ilsin_1f_instrument",   name:"악기\n보관실",     x:213, y:170, w:70,  h:116, type:"room"},
+        {id:"ilsin_1f_yeomyeong",    name:"여명스토리",       x:285, y:170, w:150, h:116, type:"room"},
+        {id:"ilsin_1f_duty",         name:"당직실",          x:485, y:170, w:86,  h:116, type:"room"},
+        {id:"ilsin_1f_admin_supp",   name:"행정\n지원실",     x:573, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_1f_art_museum",   name:"소야미술관",       x:675, y:170, w:319, h:116, type:"room"},
+        // ── exits ─ rendered on top
+        {id:"ilsin_1f_exit_mid",     name:"",               x:437, y:170, w:46,  h:116, type:"exit", reportable:false},
+        {id:"ilsin_1f_exit_l",       name:"",               x:5,   y:133, w:26,  h:26,  type:"exit", reportable:false},
+        {id:"ilsin_1f_exit_r",       name:"",               x:968, y:133, w:26,  h:26,  type:"exit", reportable:false},
+      ]
+    },
+    "2F": {
+      viewBox: "0 0 1000 296",
+      zones: [
+        // ── top row ─ y:6 h:116
+        {id:"ilsin_2f_eps",          name:"EPS",            x:5,   y:6,   w:32,  h:58,  type:"utility", reportable:false},
+        {id:"ilsin_2f_bio_lab",      name:"생물실험실",       x:39,  y:6,   w:112, h:116, type:"room"},
+        {id:"ilsin_2f_art_tchr",     name:"미술교사\n연구실", x:153, y:6,   w:92,  h:116, type:"room"},
+        {id:"ilsin_2f_art_room",     name:"미술실",          x:247, y:6,   w:120, h:116, type:"room"},
+        {id:"ilsin_2f_wc_f",         name:"학생화장실(여)",   x:369, y:6,   w:48,  h:116, type:"utility"},
+        {id:"ilsin_2f_wc_m",         name:"학생화장실(남)",   x:419, y:6,   w:48,  h:116, type:"utility"},
+        {id:"ilsin_2f_stairs_l",     name:"계단",            x:469, y:6,   w:72,  h:116, type:"utility", reportable:false},
+        {id:"ilsin_2f_lecture",      name:"다목적강의실",     x:543, y:6,   w:386, h:116, type:"room"},
+        {id:"ilsin_2f_stairs_r",     name:"계단",            x:931, y:6,   w:63,  h:116, type:"utility", reportable:false},
+        // ── corridor ─ y:128 h:36
+        {id:"ilsin_2f_corridor",     name:"복도",            x:5,   y:128, w:989, h:36,  type:"corridor"},
+        // ── bottom row ─ y:170 h:116
+        {id:"ilsin_2f_bio_tchr",     name:"생물교사\n연구실", x:5,   y:170, w:95,  h:116, type:"room"},
+        {id:"ilsin_2f_class_1_6",    name:"1-6",            x:102, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_2f_class_1_5",    name:"1-5",            x:204, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_2f_class_1_4",    name:"1-4",            x:306, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_2f_class_1_3",    name:"1-3",            x:408, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_2f_class_1_2",    name:"1-2",            x:510, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_2f_class_1_1",    name:"1-1",            x:612, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_2f_pe_tchr",      name:"체육교사\n연구실", x:714, y:170, w:100, h:116, type:"room"},
+        {id:"ilsin_2f_counseling",   name:"학생공감\n상담실", x:816, y:170, w:178, h:116, type:"room"},
+        // ── exits
+        {id:"ilsin_2f_exit_l",       name:"",               x:5,   y:133, w:26,  h:26,  type:"exit", reportable:false},
+        {id:"ilsin_2f_exit_mid",     name:"",               x:495, y:9,   w:24,  h:22,  type:"exit", reportable:false},
+        {id:"ilsin_2f_exit_r",       name:"",               x:945, y:9,   w:24,  h:22,  type:"exit", reportable:false},
+      ]
+    }
+  },
+
+  "다산관": {
+    floors: ["1F"],
+    "1F": {
+      viewBox: "0 0 1000 380",
+      zones: [
+        // ── left block: 대강당(전높이) + 준비실(좌하단)
+        {id:"dasan_1f_auditorium",   name:"대강당",          x:5,   y:5,   w:310, h:255, type:"room"},
+        {id:"dasan_1f_prep",         name:"준비실",          x:5,   y:266, w:125, h:109, type:"room"},
+        // ── vertical corridor between auditorium and right wing
+        {id:"dasan_1f_corridor_v",   name:"",               x:318, y:5,   w:40,  h:370, type:"corridor"},
+        // ── right wing top row ─ y:5 h:150
+        {id:"dasan_1f_wc_f1",        name:"화장실(여)",       x:362, y:5,   w:44,  h:150, type:"utility"},
+        {id:"dasan_1f_wc_m1",        name:"화장실(남)",       x:408, y:5,   w:44,  h:150, type:"utility"},
+        {id:"dasan_1f_stairs_l",     name:"계단",            x:454, y:5,   w:58,  h:150, type:"utility", reportable:false},
+        {id:"dasan_1f_rne",          name:"R&E",            x:514, y:5,   w:78,  h:150, type:"room"},
+        {id:"dasan_1f_reagent",      name:"시약실",          x:594, y:5,   w:64,  h:150, type:"room"},
+        {id:"dasan_1f_chem_general", name:"일반화학\n실험실", x:660, y:5,   w:150, h:150, type:"room"},
+        {id:"dasan_1f_eps",          name:"EPS",            x:812, y:5,   w:38,  h:70,  type:"utility", reportable:false},
+        {id:"dasan_1f_stairs_r",     name:"계단",            x:852, y:5,   w:56,  h:150, type:"utility", reportable:false},
+        {id:"dasan_1f_wc_f2",        name:"화장실(여)",       x:910, y:5,   w:42,  h:150, type:"utility"},
+        {id:"dasan_1f_wc_m2",        name:"화장실(남)",       x:954, y:5,   w:41,  h:150, type:"utility"},
+        // ── right wing corridor ─ y:160 h:40
+        {id:"dasan_1f_corridor_h",   name:"복도",            x:362, y:160, w:633, h:40,  type:"corridor"},
+        // ── right wing bottom row ─ y:205 h:170
+        {id:"dasan_1f_inorganic",    name:"무기화학\n실험실", x:362, y:205, w:150, h:170, type:"room"},
+        {id:"dasan_1f_chem_prep",    name:"화학\n준비실",     x:514, y:205, w:95,  h:170, type:"room"},
+        {id:"dasan_1f_organic",      name:"유기화학\n실험실", x:611, y:205, w:150, h:170, type:"room"},
+        {id:"dasan_1f_chem_analysis",name:"화학기기\n분석실", x:807, y:205, w:188, h:170, type:"room"},
+        // ── exits (3)
+        {id:"dasan_1f_exit_l",       name:"",               x:205, y:330, w:50,  h:40,  type:"exit", reportable:false},
+        {id:"dasan_1f_exit_mid",     name:"",               x:320, y:330, w:36,  h:40,  type:"exit", reportable:false},
+        {id:"dasan_1f_exit_r",       name:"",               x:763, y:205, w:42,  h:170, type:"exit", reportable:false},
+      ]
+    }
+  },
+
+  "탐의관": {
+    floors: ["1F"],
+    "1F": {
+      viewBox: "0 0 900 280",
+      zones: [
+        // ── top utility strip ─ y:5 h:78 (왼쪽→오른쪽: 계단, 출구, 출구, EPS, 화장실, … 출구)
+        {id:"tamui_1f_stairs_l",     name:"계단",            x:60,  y:5,   w:90,  h:78,  type:"utility", reportable:false},
+        {id:"tamui_1f_eps",          name:"EPS",            x:490, y:5,   w:40,  h:54,  type:"utility", reportable:false},
+        {id:"tamui_1f_wc_top",       name:"화장실",          x:534, y:5,   w:58,  h:78,  type:"utility"},
+        // ── corridor ─ y:88 h:36
+        {id:"tamui_1f_corridor",     name:"복도",            x:5,   y:88,  w:890, h:36,  type:"corridor"},
+        // ── bottom room row ─ y:128 h:148
+        {id:"tamui_1f_library",      name:"서고",            x:5,   y:128, w:150, h:148, type:"room"},
+        {id:"tamui_1f_admin",        name:"행정실",          x:157, y:128, w:235, h:148, type:"room"},
+        {id:"tamui_1f_stairs_m",     name:"계단",            x:394, y:128, w:38,  h:148, type:"utility", reportable:false},
+        {id:"tamui_1f_closed",       name:"",               x:434, y:128, w:18,  h:148, type:"utility", reportable:false},
+        {id:"tamui_1f_ops_meeting",  name:"운영위원\n회의실", x:454, y:128, w:118, h:148, type:"room"},
+        {id:"tamui_1f_principal",    name:"교장실",          x:574, y:128, w:98,  h:148, type:"room"},
+        {id:"tamui_1f_small_meeting",name:"소회의실",        x:674, y:128, w:100, h:148, type:"room"},
+        {id:"tamui_1f_wc_f",         name:"화장실(여)",       x:776, y:128, w:58,  h:148, type:"utility"},
+        {id:"tamui_1f_wc_m",         name:"화장실(남)",       x:836, y:128, w:59,  h:148, type:"utility"},
+        // ── exits (윗줄: 출구 출구 … 멀리 출구)
+        {id:"tamui_1f_exit_1",       name:"",               x:430, y:8,   w:24,  h:70,  type:"exit", reportable:false},
+        {id:"tamui_1f_exit_2",       name:"",               x:456, y:8,   w:24,  h:70,  type:"exit", reportable:false},
+        {id:"tamui_1f_exit_r",       name:"",               x:860, y:8,   w:24,  h:70,  type:"exit", reportable:false},
+      ]
+    }
+  }
+};
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let currentBuilding = "일신관";
+let currentFloor    = "2F";
+let activeReports   = {};   // zone_id → report object
+let ws              = null;
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+  ws.onopen = () => {
+    document.getElementById("ws-status").textContent = "● 연결됨";
+    document.getElementById("ws-status").className = "status-connected";
+  };
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === "update") {
+      activeReports = {};
+      data.reports.forEach(r => { activeReports[r.zone_id] = r; });
+      renderMap();
+      updateStats();
+    }
+  };
+  ws.onclose = () => {
+    document.getElementById("ws-status").textContent = "● 연결 끊김";
+    document.getElementById("ws-status").className = "status-disconnected";
+    setTimeout(connectWS, 3000);
+  };
+  ws.onerror = () => ws.close();
+}
+
+// ─── Rendering ────────────────────────────────────────────────────────────────
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function renderMap() {
+  const floorData = FLOOR_DATA[currentBuilding][currentFloor];
+  const svg = document.getElementById("floor-map");
+  svg.setAttribute("viewBox", floorData.viewBox);
+  svg.innerHTML = "";
+
+  floorData.zones.forEach(zone => {
+    if (!zone.id) return;
+    const g = document.createElementNS(SVG_NS, "g");
+    const isActive   = !!activeReports[zone.id];
+    const isExit     = zone.type === "exit";
+    const isUtility  = zone.type === "utility";
+    const isCorridor = zone.type === "corridor";
+    const reportable = zone.reportable !== false && !isExit;
+
+    // Rect
+    const rect = document.createElementNS(SVG_NS, "rect");
+    rect.setAttribute("x", zone.x + 1);
+    rect.setAttribute("y", zone.y + 1);
+    rect.setAttribute("width",  zone.w - 2);
+    rect.setAttribute("height", zone.h - 2);
+    rect.setAttribute("rx", "4");
+
+    if (isActive) {
+      rect.setAttribute("fill", "#7f1111");
+      rect.setAttribute("stroke", "#ef5350");
+      rect.setAttribute("stroke-width", "2");
+    } else if (isExit) {
+      rect.setAttribute("fill", "#0a7d34");
+      rect.setAttribute("stroke", "#2ecc71");
+      rect.setAttribute("stroke-width", "1.5");
+    } else if (isUtility) {
+      rect.setAttribute("fill", "#0f1e2e");
+      rect.setAttribute("stroke", "#1e3a5a");
+      rect.setAttribute("stroke-width", "1");
+    } else if (isCorridor) {
+      rect.setAttribute("fill", "#0d1925");
+      rect.setAttribute("stroke", "#1a3050");
+      rect.setAttribute("stroke-width", "1");
+    } else {
+      rect.setAttribute("fill", "#0e2240");
+      rect.setAttribute("stroke", "#2a5a9a");
+      rect.setAttribute("stroke-width", "1.5");
+    }
+    g.appendChild(rect);
+
+    // Exit door icon
+    if (isExit) {
+      const ic = document.createElementNS(SVG_NS, "text");
+      ic.setAttribute("x", zone.x + zone.w / 2);
+      ic.setAttribute("y", zone.y + zone.h / 2);
+      ic.setAttribute("text-anchor", "middle");
+      ic.setAttribute("dominant-baseline", "central");
+      ic.setAttribute("font-size", Math.min(15, zone.w - 6));
+      ic.setAttribute("pointer-events", "none");
+      ic.textContent = "🚪";
+      g.appendChild(ic);
+      svg.appendChild(g);
+      return;
+    }
+
+    // Pulse animation for active zones
+    if (isActive) {
+      const cx = zone.x + zone.w / 2;
+      const cy = zone.y + zone.h / 2;
+      const pulse = document.createElementNS(SVG_NS, "circle");
+      pulse.setAttribute("cx", cx);
+      pulse.setAttribute("cy", cy);
+      pulse.setAttribute("r", "8");
+      pulse.setAttribute("fill", "none");
+      pulse.setAttribute("stroke", "#ff5252");
+      pulse.setAttribute("stroke-width", "2");
+      pulse.setAttribute("opacity", "0.8");
+      const a1 = document.createElementNS(SVG_NS, "animate");
+      a1.setAttribute("attributeName", "r");
+      a1.setAttribute("values", "6;18;6");
+      a1.setAttribute("dur", "1.6s");
+      a1.setAttribute("repeatCount", "indefinite");
+      const a2 = document.createElementNS(SVG_NS, "animate");
+      a2.setAttribute("attributeName", "opacity");
+      a2.setAttribute("values", "0.8;0;0.8");
+      a2.setAttribute("dur", "1.6s");
+      a2.setAttribute("repeatCount", "indefinite");
+      pulse.appendChild(a1);
+      pulse.appendChild(a2);
+      g.appendChild(pulse);
+    }
+
+    // Text label
+    if (zone.name && zone.w > 30 && zone.h > 24) {
+      const lines = zone.name.split("\n");
+      const cx = zone.x + zone.w / 2;
+      const cy = zone.y + zone.h / 2;
+      const fontSize = zone.w < 55 ? 9 : zone.w < 90 ? 10 : 11;
+      const lineH = fontSize + 3;
+      const startY = cy - ((lines.length - 1) * lineH) / 2;
+
+      lines.forEach((line, i) => {
+        const t = document.createElementNS(SVG_NS, "text");
+        t.setAttribute("x", cx);
+        t.setAttribute("y", startY + i * lineH);
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("dominant-baseline", "middle");
+        t.setAttribute("font-size", fontSize);
+        t.setAttribute("fill", isActive ? "#ffcdd2" : (isUtility ? "#3a5a7a" : "#9fc8f0"));
+        t.setAttribute("font-weight", isActive ? "700" : "400");
+        t.setAttribute("pointer-events", "none");
+        t.textContent = line;
+        g.appendChild(t);
+      });
+
+      if (isActive) {
+        const emoji = document.createElementNS(SVG_NS, "text");
+        emoji.setAttribute("x", zone.x + zone.w - 12);
+        emoji.setAttribute("y", zone.y + 16);
+        emoji.setAttribute("font-size", 14);
+        emoji.setAttribute("pointer-events", "none");
+        emoji.textContent = "🦟";
+        g.appendChild(emoji);
+      }
+    }
+
+    // Interaction
+    if (reportable) {
+      g.style.cursor = "pointer";
+      g.addEventListener("mouseenter", () => {
+        rect.setAttribute("fill", isActive ? "#9b1111" : (isUtility ? "#152535" : "#152e55"));
+      });
+      g.addEventListener("mouseleave", () => {
+        if (isActive)        rect.setAttribute("fill", "#7f1111");
+        else if (isUtility)  rect.setAttribute("fill", "#0f1e2e");
+        else                 rect.setAttribute("fill", "#0e2240");
+      });
+      g.addEventListener("click", () => openModal(zone));
+    }
+
+    svg.appendChild(g);
+  });
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const total = Object.keys(activeReports).length;
+  document.getElementById("total-count").textContent = total;
+
+  const bCount = {};
+  Object.values(activeReports).forEach(r => {
+    bCount[r.building] = (bCount[r.building] || 0) + 1;
+  });
+  const parts = Object.entries(bCount).map(([b, c]) => `${b}: ${c}건`);
+  document.getElementById("building-count").textContent = parts.join(" · ");
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function openModal(zone) {
+  const overlay = document.getElementById("modal-overlay");
+  const report  = activeReports[zone.id];
+
+  document.getElementById("modal-zone").textContent =
+    zone.name.replace("\n", " ") + ` (${currentBuilding} ${currentFloor})`;
+
+  const btns = document.getElementById("modal-btns");
+  btns.innerHTML = "";
+
+  if (report) {
+    document.getElementById("modal-title").textContent = "⚠️ 모기 신고 구역";
+    document.getElementById("modal-meta").textContent  = `신고 시각: ${formatKST(report.reported_at)}`;
+    document.getElementById("modal-desc").textContent  =
+      "이 구역에 모기가 신고되어 있습니다.\n상황이 종료되었으면 아래 버튼을 눌러주세요.";
+
+    const resolveBtn = document.createElement("button");
+    resolveBtn.className = "btn btn-danger";
+    resolveBtn.textContent = "상황 종료";
+    resolveBtn.onclick = async () => {
+      await fetch(`/api/resolve/${encodeURIComponent(zone.id)}`, { method: "POST" });
+      closeModal();
+    };
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn btn-ghost";
+    cancelBtn.textContent = "닫기";
+    cancelBtn.onclick = closeModal;
+    btns.appendChild(resolveBtn);
+    btns.appendChild(cancelBtn);
+  } else {
+    document.getElementById("modal-title").textContent = "🦟 모기 신고";
+    document.getElementById("modal-meta").textContent  = "";
+    document.getElementById("modal-desc").textContent  =
+      "이 구역에 모기가 있습니까?\n신고하면 지도에 표시되며 30분 후 자동 해제됩니다.";
+
+    const reportBtn = document.createElement("button");
+    reportBtn.className = "btn btn-primary";
+    reportBtn.textContent = "신고하기";
+    reportBtn.onclick = async () => {
+      await fetch("/api/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          zone_id:   zone.id,
+          building:  currentBuilding,
+          floor:     currentFloor,
+          zone_name: zone.name.replace("\n", " ")
+        })
+      });
+      closeModal();
+    };
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn btn-ghost";
+    cancelBtn.textContent = "취소";
+    cancelBtn.onclick = closeModal;
+    btns.appendChild(reportBtn);
+    btns.appendChild(cancelBtn);
+  }
+
+  overlay.classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("modal-overlay").classList.remove("open");
+}
+
+document.getElementById("modal-overlay").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function buildTabs() {
+  const bTab = document.getElementById("building-tabs");
+  Object.keys(FLOOR_DATA).forEach(b => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (b === currentBuilding ? " active" : "");
+    btn.textContent = b;
+    btn.onclick = () => selectBuilding(b);
+    bTab.appendChild(btn);
+  });
+  renderFloorTabs();
+}
+
+function renderFloorTabs() {
+  const fTab = document.getElementById("floor-tabs");
+  fTab.innerHTML = "";
+  FLOOR_DATA[currentBuilding].floors.forEach(f => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (f === currentFloor ? " active" : "");
+    btn.textContent = f;
+    btn.onclick = () => selectFloor(f);
+    fTab.appendChild(btn);
+  });
+}
+
+function selectBuilding(b) {
+  currentBuilding = b;
+  currentFloor = FLOOR_DATA[b].floors[0];
+  document.querySelectorAll("#building-tabs .tab-btn").forEach(el => {
+    el.classList.toggle("active", el.textContent === b);
+  });
+  renderFloorTabs();
+  renderMap();
+}
+
+function selectFloor(f) {
+  currentFloor = f;
+  document.querySelectorAll("#floor-tabs .tab-btn").forEach(el => {
+    el.classList.toggle("active", el.textContent === f);
+  });
+  renderMap();
+}
+
+// ─── Utility ─────────────────────────────────────────────────────────────────
+function formatKST(utcIso) {
+  try {
+    const d = new Date(utcIso + "Z");
+    return d.toLocaleString("ko-KR", {
+      timeZone: "Asia/Seoul",
+      month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit"
+    });
+  } catch (_) { return utcIso; }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+buildTabs();
+renderMap();
+connectWS();
+</script>
+</body>
+</html>
