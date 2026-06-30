@@ -226,7 +226,9 @@ const FLOOR_DATA = {
         {id:"ilsin_1f_stairs_r",     name:"계단",            x:746, y:6,   w:56,  h:116, type:"utility", reportable:false},
         {id:"ilsin_1f_library",      name:"서고",            x:804, y:6,   w:190, h:116, type:"room"},
         // ── corridor ─ y:128 h:36
-        {id:"ilsin_1f_corridor",     name:"복도",            x:5,   y:128, w:989, h:36,  type:"corridor"},
+        {id:"ilsin_1f_corr_w",       name:"복도(서)",        x:5,   y:128, w:326, h:36,  type:"corridor"},
+        {id:"ilsin_1f_corr_m",       name:"복도(중)",        x:333, y:128, w:328, h:36,  type:"corridor"},
+        {id:"ilsin_1f_corr_e",       name:"복도(동)",        x:663, y:128, w:331, h:36,  type:"corridor"},
         // ── bottom row ─ y:170 h:116
         {id:"ilsin_1f_health",       name:"보건실",          x:5,   y:170, w:120, h:116, type:"room"},
         {id:"ilsin_1f_music_tchr",   name:"음악교과\n연구실", x:127, y:170, w:84,  h:116, type:"room"},
@@ -255,7 +257,9 @@ const FLOOR_DATA = {
         {id:"ilsin_2f_lecture",      name:"다목적강의실",     x:543, y:6,   w:386, h:116, type:"room"},
         {id:"ilsin_2f_stairs_r",     name:"계단",            x:931, y:6,   w:63,  h:116, type:"utility", reportable:false},
         // ── corridor ─ y:128 h:36
-        {id:"ilsin_2f_corridor",     name:"복도",            x:5,   y:128, w:989, h:36,  type:"corridor"},
+        {id:"ilsin_2f_corr_w",       name:"복도(서)",        x:5,   y:128, w:326, h:36,  type:"corridor"},
+        {id:"ilsin_2f_corr_m",       name:"복도(중)",        x:333, y:128, w:328, h:36,  type:"corridor"},
+        {id:"ilsin_2f_corr_e",       name:"복도(동)",        x:663, y:128, w:331, h:36,  type:"corridor"},
         // ── bottom row ─ y:170 h:116
         {id:"ilsin_2f_bio_tchr",     name:"생물교사\n연구실", x:5,   y:170, w:95,  h:116, type:"room"},
         {id:"ilsin_2f_class_1_6",    name:"1-6",            x:102, y:170, w:100, h:116, type:"room"},
@@ -282,8 +286,9 @@ const FLOOR_DATA = {
         // ── left block: 대강당(전높이) + 준비실(좌하단)
         {id:"dasan_1f_auditorium",   name:"대강당",          x:5,   y:5,   w:310, h:255, type:"room"},
         {id:"dasan_1f_prep",         name:"준비실",          x:5,   y:266, w:125, h:109, type:"room"},
+        {id:"dasan_1f_hall_front",   name:"대강당 앞\n(로비)", x:132, y:266, w:184, h:109, type:"corridor"},
         // ── vertical corridor between auditorium and right wing
-        {id:"dasan_1f_corridor_v",   name:"",               x:318, y:5,   w:40,  h:370, type:"corridor"},
+        {id:"dasan_1f_corridor_v",   name:"복도(중)",        x:318, y:5,   w:40,  h:370, type:"corridor"},
         // ── right wing top row ─ y:5 h:150
         {id:"dasan_1f_wc_f1",        name:"화장실(여)",       x:362, y:5,   w:44,  h:150, type:"utility"},
         {id:"dasan_1f_wc_m1",        name:"화장실(남)",       x:408, y:5,   w:44,  h:150, type:"utility"},
@@ -320,7 +325,9 @@ const FLOOR_DATA = {
         {id:"tamui_1f_eps",          name:"EPS",            x:490, y:5,   w:40,  h:54,  type:"utility", reportable:false},
         {id:"tamui_1f_wc_top",       name:"화장실",          x:534, y:5,   w:58,  h:78,  type:"utility"},
         // ── corridor ─ y:88 h:36
-        {id:"tamui_1f_corridor",     name:"복도",            x:5,   y:88,  w:890, h:36,  type:"corridor"},
+        {id:"tamui_1f_corr_w",       name:"복도(서)",        x:5,   y:88,  w:295, h:36,  type:"corridor"},
+        {id:"tamui_1f_corr_m",       name:"복도(중)",        x:302, y:88,  w:295, h:36,  type:"corridor"},
+        {id:"tamui_1f_corr_e",       name:"복도(동)",        x:599, y:88,  w:296, h:36,  type:"corridor"},
         // ── bottom room row ─ y:128 h:148
         {id:"tamui_1f_library",      name:"서고",            x:5,   y:128, w:150, h:148, type:"room"},
         {id:"tamui_1f_admin",        name:"행정실",          x:157, y:128, w:235, h:148, type:"room"},
@@ -501,11 +508,12 @@ function renderMap() {
     if (reportable) {
       g.style.cursor = "pointer";
       g.addEventListener("mouseenter", () => {
-        rect.setAttribute("fill", isActive ? "#9b1111" : (isUtility ? "#152535" : "#152e55"));
+        rect.setAttribute("fill", isActive ? "#9b1111" : (isUtility ? "#152535" : (isCorridor ? "#13202e" : "#152e55")));
       });
       g.addEventListener("mouseleave", () => {
         if (isActive)        rect.setAttribute("fill", "#7f1111");
         else if (isUtility)  rect.setAttribute("fill", "#0f1e2e");
+        else if (isCorridor) rect.setAttribute("fill", "#0d1925");
         else                 rect.setAttribute("fill", "#0e2240");
       });
       g.addEventListener("click", () => openModal(zone));
