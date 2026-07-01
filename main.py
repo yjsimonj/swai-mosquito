@@ -15,6 +15,34 @@ app = FastAPI()
 DB_PATH = os.environ.get("DB_PATH", "mosquito.db")
 TIMEOUT_MINUTES = 30
 
+# ── MQTT (기기 푸시용) ──────────────────────────────────────────────
+# 공개 브로커(HiveMQ)에 평문(1883)으로 발행 → GIGA가 구독. 인증서 불필요.
+# 신고/해제 빈도가 낮으므로 매번 일회성 발행(publish.single)이 가장 안정적.
+import paho.mqtt.publish as mqtt_publish
+
+MQTT_BROKER = os.environ.get("MQTT_BROKER", "broker.hivemq.com")
+MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
+# 공개 브로커라 토픽 충돌 방지용 고유 접두어
+MQTT_PREFIX = os.environ.get("MQTT_PREFIX", "swaimosquito/43th36")
+
+
+def _publish_zone_sync(zone_id: str, active: bool):
+    try:
+        mqtt_publish.single(
+            f"{MQTT_PREFIX}/zone/{zone_id}",
+            "1" if active else "0",
+            retain=True,               # 신규 구독자도 즉시 현재값 수신
+            hostname=MQTT_BROKER,
+            port=MQTT_PORT,
+        )
+    except Exception as e:
+        print(f"[MQTT] publish failed: {e}")
+
+
+async def mqtt_publish_zone(zone_id: str, active: bool):
+    # 블로킹 발행을 이벤트 루프 밖(스레드)에서 실행
+    await asyncio.to_thread(_publish_zone_sync, zone_id, active)
+
 
 class ConnectionManager:
     """브라우저(지도)와 기기(아두이노) 연결을 함께 관리.
@@ -107,6 +135,12 @@ async def timeout_loop():
         await asyncio.sleep(60)
         conn = sqlite3.connect(DB_PATH)
         cutoff = (datetime.utcnow() - timedelta(minutes=TIMEOUT_MINUTES)).isoformat()
+        timed_out = [
+            r[0] for r in conn.execute(
+                "SELECT zone_id FROM reports WHERE status='active' AND reported_at < ?",
+                (cutoff,),
+            ).fetchall()
+        ]
         conn.execute(
             "UPDATE reports SET status='timeout', resolved_at=? "
             "WHERE status='active' AND reported_at < ?",
@@ -115,6 +149,8 @@ async def timeout_loop():
         conn.commit()
         conn.close()
         await manager.broadcast()
+        for z in timed_out:
+            await mqtt_publish_zone(z, False)
 
 
 @app.on_event("startup")
@@ -146,6 +182,7 @@ async def report(req: ReportRequest):
         conn.commit()
     conn.close()
     await manager.broadcast()
+    await mqtt_publish_zone(req.zone_id, True)
     return {"ok": True}
 
 
@@ -160,6 +197,7 @@ async def resolve(zone_id: str):
     conn.commit()
     conn.close()
     await manager.broadcast()
+    await mqtt_publish_zone(zone_id, False)
     return {"ok": True}
 
 
