@@ -556,9 +556,9 @@ function openModal(zone) {
     const resolveBtn = document.createElement("button");
     resolveBtn.className = "btn btn-danger";
     resolveBtn.textContent = "상황 종료";
-    resolveBtn.onclick = async () => {
-      await fetch(`/api/resolve/${encodeURIComponent(zone.id)}`, { method: "POST" });
-      closeModal();
+    resolveBtn.onclick = () => {
+      closeModal();  // 즉시 닫기 (지도는 WebSocket으로 갱신)
+      fetch(`/api/resolve/${encodeURIComponent(zone.id)}`, { method: "POST" }).catch(() => {});
     };
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "btn btn-ghost";
@@ -575,8 +575,9 @@ function openModal(zone) {
     const reportBtn = document.createElement("button");
     reportBtn.className = "btn btn-primary";
     reportBtn.textContent = "신고하기";
-    reportBtn.onclick = async () => {
-      await fetch("/api/report", {
+    reportBtn.onclick = () => {
+      closeModal();  // 즉시 닫기 (지도는 WebSocket으로 갱신)
+      fetch("/api/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -585,8 +586,7 @@ function openModal(zone) {
           floor:     currentFloor,
           zone_name: zone.name.replace("\n", " ")
         })
-      });
-      closeModal();
+      }).catch(() => {});
     };
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "btn btn-ghost";
