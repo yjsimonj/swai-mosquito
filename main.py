@@ -182,7 +182,7 @@ async def report(req: ReportRequest):
         conn.commit()
     conn.close()
     await manager.broadcast()
-    await mqtt_publish_zone(req.zone_id, True)
+    asyncio.create_task(mqtt_publish_zone(req.zone_id, True))  # 백그라운드 발행(응답 지연 방지)
     return {"ok": True}
 
 
@@ -197,7 +197,7 @@ async def resolve(zone_id: str):
     conn.commit()
     conn.close()
     await manager.broadcast()
-    await mqtt_publish_zone(zone_id, False)
+    asyncio.create_task(mqtt_publish_zone(zone_id, False))  # 백그라운드 발행(응답 지연 방지)
     return {"ok": True}
 
 
